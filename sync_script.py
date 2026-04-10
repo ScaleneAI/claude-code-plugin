@@ -31,7 +31,11 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+from functools import partial
 from pathlib import Path
+
+# Unbuffered output so Claude Code sees progress immediately.
+print = partial(print, flush=True)
 
 # ─── Privacy whitelist ───────────────────────────────────────────────
 #
@@ -158,7 +162,7 @@ def _post(url: str, token: str, payload: dict) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body = e.read().decode()[:200]
@@ -177,14 +181,27 @@ def sync(api_url: str, token: str, root: Path, session_filter: str | None = None
     identity = _get_identity()
     ingest_url = f"{api_url.rstrip('/')}/api/ingest/sessions"
 
+    print(f"Scalene Sync")
+    print(f"  api:  {api_url}")
+    print(f"  root: {root}")
+    if identity:
+        print(f"  user: {identity.get('email', '?')}")
+    print()
+
+    # Discover files first.
+    all_files = list(_find_session_files(root))
+    print(f"Found {len(all_files)} JSONL files")
+
     sessions_total = 0
     turns_total = 0
+    batches_sent = 0
+    errors = 0
 
     # Dedup across subagent files (they share UUIDs with parent).
     seen_sessions: set[str] = set()
     seen_turns: set[str] = set()
 
-    for jsonl_path in _find_session_files(root):
+    for i, jsonl_path in enumerate(all_files):
         if session_filter and session_filter not in str(jsonl_path):
             continue
 
@@ -215,10 +232,22 @@ def sync(api_url: str, token: str, root: Path, session_filter: str | None = None
             payload["agent_identity"] = identity
 
         result = _post(ingest_url, token, payload)
-        sessions_total += result.get("sessions_upserted", 0)
-        turns_total += result.get("turns_upserted", 0)
+        s = result.get("sessions_upserted", 0)
+        t = result.get("turns_upserted", 0)
+        sessions_total += s
+        turns_total += t
+        batches_sent += 1
+        if not result:
+            errors += 1
 
-    print(f"Synced {sessions_total} sessions, {turns_total} turns")
+        # Progress every 10 batches.
+        if batches_sent % 10 == 0:
+            print(f"  [{batches_sent}] {sessions_total} sessions, {turns_total} turns so far...")
+
+    print()
+    print(f"Done. {sessions_total} sessions, {turns_total} turns synced in {batches_sent} batches.")
+    if errors:
+        print(f"  {errors} batches had errors.")
     return sessions_total, turns_total
 
 
