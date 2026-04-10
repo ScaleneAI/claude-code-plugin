@@ -58,6 +58,7 @@ def _extract_session(line: dict) -> dict | None:
         "user_type": line.get("userType"),
         "entrypoint": line.get("entrypoint"),
         "started_at": line.get("timestamp"),
+        "permission_mode": line.get("permissionMode"),
     }
 
 
@@ -69,34 +70,57 @@ def _extract_turn(line: dict) -> dict | None:
     if turn_type not in ("user", "assistant", "tool_result"):
         return None
 
-    msg = line.get("message", {})
-    usage = msg.get("usage", {})
-    cache = usage.get("cache_creation", {})
-    server_tools = msg.get("server_tool_use", {})
+    msg = line.get("message", {}) or {}
+    usage = msg.get("usage", {}) or {}
+    cache = usage.get("cache_creation", {}) or {}
+    server_tools = usage.get("server_tool_use", {}) or {}
+    content = msg.get("content", []) or []
 
-    # Tool name only — never input or content.
-    tool_name = None
-    for block in msg.get("content", []):
+    # Tool names only — never input or content.
+    tool_names = []
+    for block in content:
         if isinstance(block, dict) and block.get("type") == "tool_use":
-            tool_name = block.get("name")
-            break
+            name = block.get("name")
+            if name:
+                tool_names.append(name)
+
+    # Count content block types (text, thinking, tool_use, tool_result, image).
+    block_counts: dict[str, int] = {}
+    for block in content:
+        if isinstance(block, dict):
+            bt = block.get("type", "unknown")
+            block_counts[bt] = block_counts.get(bt, 0) + 1
 
     return {
         "uuid": uid,
         "session_id": line.get("sessionId"),
         "workspace_id": "default",
         "parent_uuid": line.get("parentUuid"),
+        "is_sidechain": bool(line.get("isSidechain")),
         "turn_type": turn_type,
         "timestamp": line.get("timestamp"),
         "model_id": msg.get("model"),
+        "stop_reason": msg.get("stop_reason"),
+        # Token counts
         "input_tokens": usage.get("input_tokens", 0),
         "output_tokens": usage.get("output_tokens", 0),
         "cache_read_tokens": usage.get("cache_read_input_tokens", 0),
-        "cache_creation_5m_tokens": cache.get("five_minute_tokens", 0),
-        "cache_creation_1h_tokens": cache.get("one_hour_tokens", 0),
-        "web_search_count": server_tools.get("web_search", 0),
-        "web_fetch_count": server_tools.get("web_fetch", 0),
-        "tool_name": tool_name,
+        "cache_creation_5m_tokens": cache.get("ephemeral_5m_input_tokens", 0),
+        "cache_creation_1h_tokens": cache.get("ephemeral_1h_input_tokens", 0),
+        # Server tool usage
+        "web_search_count": server_tools.get("web_search_requests", 0),
+        "web_fetch_count": server_tools.get("web_fetch_requests", 0),
+        # Tool metadata — names only, never input/output
+        "tool_name": tool_names[0] if tool_names else None,
+        "tool_names": tool_names,
+        "tool_count": len(tool_names),
+        # Content shape (no actual content)
+        "block_counts": block_counts,
+        "has_thinking": block_counts.get("thinking", 0) > 0,
+        "has_image": block_counts.get("image", 0) > 0,
+        # Performance metadata
+        "speed": usage.get("speed"),
+        "service_tier": usage.get("service_tier"),
     }
 
 
@@ -150,27 +174,43 @@ def _get_identity() -> dict | None:
 # ─── API ─────────────────────────────────────────────────────────────
 
 
-def _post(url: str, token: str, payload: dict) -> dict:
+def _post(url: str, token: str, payload: dict, retries: int = 3) -> dict:
+    import time
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()[:200]
-        print(f"  HTTP {e.code}: {body}", file=sys.stderr)
-        return {}
-    except Exception as e:
-        print(f"  error: {e}", file=sys.stderr)
-        return {}
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            try:
+                body = e.read().decode()[:200]
+            except Exception:
+                body = "(unreadable)"
+            if e.code >= 500 and attempt < retries - 1:
+                wait = 2 * (attempt + 1)
+                print(f"  HTTP {e.code}, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            print(f"  HTTP {e.code}: {body}", file=sys.stderr)
+            return {}
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 2 * (attempt + 1)
+                print(f"  error: {e}, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            print(f"  error: {e}", file=sys.stderr)
+            return {}
+    return {}
 
 
 # ─── Sync ────────────────────────────────────────────────────────────
@@ -231,6 +271,7 @@ def sync(api_url: str, token: str, root: Path, session_filter: str | None = None
         if identity:
             payload["agent_identity"] = identity
 
+        import time
         result = _post(ingest_url, token, payload)
         s = result.get("sessions_upserted", 0)
         t = result.get("turns_upserted", 0)
@@ -243,6 +284,9 @@ def sync(api_url: str, token: str, root: Path, session_filter: str | None = None
         # Progress every 10 batches.
         if batches_sent % 10 == 0:
             print(f"  [{batches_sent}] {sessions_total} sessions, {turns_total} turns so far...")
+
+        # Rate limit: 200ms between batches to avoid overwhelming the server.
+        time.sleep(0.2)
 
     print()
     print(f"Done. {sessions_total} sessions, {turns_total} turns synced in {batches_sent} batches.")
