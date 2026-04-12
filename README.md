@@ -5,7 +5,7 @@ Claude Code plugin for [Scalene](https://getscalene.com) — the AI coding score
 ## Install
 
 ```bash
-claude plugin install https://github.com/mtrbls/scalene-mcp
+claude plugin install https://github.com/scaleneai/mcp
 ```
 
 Then set your credentials (from your [dashboard](https://getscalene.com/me) → Connect):
@@ -26,7 +26,7 @@ The plugin registers a `SessionEnd` hook that fires once when you close a Claude
 Want your past sessions too?
 
 ```bash
-curl -sL https://raw.githubusercontent.com/mtrbls/scalene-mcp/main/sync_script.py | python3 - --api-url 'https://getscalene.com/u/<your-token>' --token '<your-bearer-token>'
+curl -sL https://raw.githubusercontent.com/scaleneai/mcp/main/sync_script.py | python3 - --api-url 'https://getscalene.com/u/<your-token>' --token '<your-bearer-token>'
 ```
 
 ## What gets exported
