@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    {
+      "name": "scalene",
+      "description": "AI coding scorecard — auto-sync Claude Code sessions to getscalene.com",
+      "path": "."
+    }
+  ]
+}
