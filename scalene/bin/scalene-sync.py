@@ -379,6 +379,67 @@ def sync_history_stubs(api_url: str, token: str, history_path: Path, root: Path)
     print(f"Recovered {total} activity stubs from purged history")
 
 
+def sync_bulk(api_url: str, token: str, root: Path):
+    """Collect everything locally, write to /tmp, upload in one request."""
+    identity = _get_identity()
+    ingest_url = f"{api_url.rstrip('/')}/api/ingest/bulk"
+
+    print("Scalene Bulk Sync")
+    print(f"  api:  {api_url}")
+    print(f"  root: {root}")
+    print()
+
+    all_files = list(_find_session_files(root))
+    print(f"Found {len(all_files)} JSONL files")
+
+    all_sessions: list[dict] = []
+    all_turns: list[dict] = []
+    seen_sessions: set[str] = set()
+    seen_turns: set[str] = set()
+
+    for i, jsonl_path in enumerate(all_files):
+        for line in _iter_jsonl(jsonl_path):
+            sm = _extract_session(line)
+            if sm and sm["id"] not in seen_sessions:
+                seen_sessions.add(sm["id"])
+                sm["project_path_encoded"] = sm["cwd"].replace("/", "-")
+                sm["jsonl_path"] = str(jsonl_path)
+                sm["jsonl_offset"] = 0
+                sm["total_turns"] = 0
+                sm["is_subagent"] = 0
+                all_sessions.append(sm)
+
+            tm = _extract_turn(line)
+            if tm and tm["uuid"] not in seen_turns:
+                seen_turns.add(tm["uuid"])
+                all_turns.append(tm)
+
+        if (i + 1) % 200 == 0:
+            print(f"  scanned {i + 1}/{len(all_files)} files...")
+
+    print(f"Collected {len(all_sessions)} sessions, {len(all_turns)} turns")
+
+    # Write to temp file
+    import tempfile
+    payload: dict = {"sessions": all_sessions, "turns": all_turns}
+    if identity:
+        payload["agent_identity"] = identity
+
+    tmp = Path(tempfile.mktemp(suffix=".json", prefix="scalene_bulk_"))
+    with tmp.open("w") as f:
+        json.dump(payload, f)
+    size_mb = tmp.stat().st_size / 1024 / 1024
+    print(f"Wrote {size_mb:.1f}MB to {tmp}")
+
+    # Upload
+    print("Uploading...")
+    with tmp.open("rb") as f:
+        data = f.read()
+    result = _post(ingest_url, token, json.loads(data), retries=1)
+    print(f"Result: {result}")
+    tmp.unlink(missing_ok=True)
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -390,11 +451,14 @@ if __name__ == "__main__":
     parser.add_argument("--api-url", required=True, help="Scalene API base URL")
     parser.add_argument("--token", required=True, help="Bearer token for authentication")
     parser.add_argument("--session-only", default=None, help="Sync a single session ID")
+    parser.add_argument("--bulk", action="store_true", help="Bulk mode: collect all, upload once")
     parser.add_argument("--root", default=str(Path.home() / ".claude" / "projects"))
     args = parser.parse_args()
 
-    sync(args.api_url, args.token, Path(args.root), args.session_only)
-
-    if not args.session_only:
-        history = Path.home() / ".claude" / "history.jsonl"
-        sync_history_stubs(args.api_url, args.token, history, Path(args.root))
+    if args.bulk:
+        sync_bulk(args.api_url, args.token, Path(args.root))
+    else:
+        sync(args.api_url, args.token, Path(args.root), args.session_only)
+        if not args.session_only:
+            history = Path.home() / ".claude" / "history.jsonl"
+            sync_history_stubs(args.api_url, args.token, history, Path(args.root))
