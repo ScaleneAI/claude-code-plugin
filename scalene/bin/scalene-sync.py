@@ -21,7 +21,7 @@ Usage:
     python3 sync_script.py --api-url https://scalene.example.com --token <bearer>
     python3 sync_script.py --api-url ... --token ... --session-only <id>
 
-Audit this file: https://github.com/mtrbls/scalene-mcp/blob/main/sync_script.py
+Audit this file: https://github.com/scaleneai/claude-code-plugin/blob/main/sync_script.py
 """
 
 from __future__ import annotations
@@ -216,7 +216,7 @@ def _post(url: str, token: str, payload: dict, retries: int = 3) -> dict:
 # ─── Sync ────────────────────────────────────────────────────────────
 
 
-BATCH_TURNS = 200  # flush when turn buffer hits this size
+BATCH_TURNS = 1000  # flush when turn buffer hits this size
 
 
 def sync(api_url: str, token: str, root: Path, session_filter: str | None = None):
@@ -264,7 +264,7 @@ def sync(api_url: str, token: str, root: Path, session_filter: str | None = None
         print(f"  batch {batches_sent}: {len(session_buf)}s {len(turn_buf)}t → {s}s {t}t")
         session_buf.clear()
         turn_buf.clear()
-        time.sleep(0.2)
+        time.sleep(0.1)
 
     for i, jsonl_path in enumerate(all_files):
         if session_filter and session_filter not in str(jsonl_path):
