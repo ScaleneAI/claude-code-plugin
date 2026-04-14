@@ -386,7 +386,10 @@ def sync_bulk(api_url: str, token: str, root: Path):
     from datetime import datetime as _dt, timedelta as _td
 
     identity = _get_identity()
-    ingest_url = f"{api_url.rstrip('/')}/api/ingest/sessions"
+    # Chunks skip score recompute — we trigger one at the end instead of
+    # replaying ELO for every user on every chunk.
+    ingest_url = f"{api_url.rstrip('/')}/api/ingest/sessions?skip_score=1"
+    recompute_url = f"{api_url.rstrip('/')}/api/ingest/recompute-score"
     cutoff = (_dt.utcnow() - _td(days=90)).isoformat() + "Z"
 
     print("Scalene Bulk Sync (last 3 months)")
@@ -484,6 +487,16 @@ def sync_bulk(api_url: str, token: str, root: Path):
             payload["agent_identity"] = identity
         result = _post(ingest_url, token, payload)
         sessions_total += result.get("sessions_upserted", 0)
+
+    # Phase 4: single score recompute now that every chunk has landed.
+    print()
+    print("Recomputing score...")
+    try:
+        result = _post(recompute_url, token, {})
+        if result.get("ok"):
+            print(f"  score = {result.get('score')}")
+    except Exception as exc:
+        print(f"  score recompute failed: {exc}")
 
     print()
     print(f"Done. {sessions_total} sessions, {turns_total} turns in {total_chunks} chunks.")
