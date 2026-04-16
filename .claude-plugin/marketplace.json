@@ -1,13 +1,13 @@
 {
   "name": "scaleneai-claude-code-plugin",
   "owner": {
-    "name": "ScaleneAI",
-    "url": "https://getscalene.com"
+    "name": "Plouto",
+    "url": "https://plouto.ai"
   },
   "plugins": [
     {
       "name": "scalene",
-      "description": "AI coding scorecard — auto-sync Claude Code sessions to getscalene.com",
+      "description": "AI Engineering Intelligence",
       "source": "./scalene"
     }
   ]
