@@ -47,7 +47,7 @@ def _get_credentials():
     subprocess.run(["open", url], check=False)
 
     # Poll with device_code (the secret), not user_code (the display value).
-    for i in range(60):
+    for i in range(200):
         time.sleep(3)
         r = json.loads(
             urllib.request.urlopen(
