@@ -3,7 +3,7 @@ name: plouto
 description: AI Engineering Intelligence
 arguments:
   - name: action
-    description: "setup = configure credentials, sync = import all history, sync session = current session only, status = show dashboard link"
+    description: "setup = authenticate and sync, sync = import all history, sync session = current session only, status = show dashboard link"
     required: true
 ---
 
@@ -13,27 +13,25 @@ The sync script is at `${CLAUDE_PLUGIN_ROOT}/bin/scalene-sync.py`. Credentials a
 
 ### /plouto setup
 
-CRITICAL: Do NOT ask the user to paste credentials. Do NOT show menus. Do NOT check env vars yourself. Just run this ONE command:
+Run this ONE command. It opens the browser for OAuth login, saves the token, and syncs history:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/bin/scalene-auth.py
 ```
 
-This single script handles everything: checks credentials, authenticates if needed (opens browser), saves to ~/.zshrc, and runs the sync. No other commands needed.
-
 ### /plouto setup auth
 
-Force re-authentication even if credentials exist. Clears existing credentials and runs the device auth flow:
+Force re-authentication (clears existing credentials first):
 
 ```bash
-sed -i '' '/SCALENE_API_URL/d; /SCALENE_TOKEN/d' ~/.zshrc && unset SCALENE_API_URL SCALENE_TOKEN && python3 ${CLAUDE_PLUGIN_ROOT}/bin/scalene-auth.py
+python3 ${CLAUDE_PLUGIN_ROOT}/bin/scalene-auth.py --force
 ```
 
 ### /plouto sync
 
 Run: `python3 ${CLAUDE_PLUGIN_ROOT}/bin/scalene-sync.py --bulk --api-url "$SCALENE_API_URL" --token "$SCALENE_TOKEN"`
 
-Collects all data locally, uploads in one request. Much faster than streaming.
+Collects all data locally, uploads in one request.
 
 ### /plouto sync session
 
