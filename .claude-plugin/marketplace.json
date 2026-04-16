@@ -6,9 +6,9 @@
   },
   "plugins": [
     {
-      "name": "scalene",
+      "name": "plouto",
       "description": "AI Engineering Intelligence",
-      "source": "./scalene"
+      "source": "./plouto"
     }
   ]
 }
