@@ -9,7 +9,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-API = "https://plouto.ai"
+API = "https://api.plouto.ai"
 
 
 def _get_credentials():
