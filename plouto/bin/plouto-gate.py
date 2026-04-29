@@ -81,17 +81,18 @@ def _box(required: str, current: str) -> str:
 
     lines = [
         "╭───────────────────────────────────────────╮",
-        "│  ⚠  PLOUTO WORKSPACE POLICY               │",
+        "│  ◇  PLOUTO WORKSPACE RECOMMENDATION       │",
         "├───────────────────────────────────────────┤",
-        f"│   Required:  {req_short:<28} │",
-        f"│   Current:   {cur_short:<28} │",
+        f"│   Recommended:  {req_short:<25} │",
+        f"│   You're on:    {cur_short:<25} │",
         "├───────────────────────────────────────────┤",
-        "│   To comply, in your next prompt:         │",
+        "│   Allow  →  continue on current model     │",
+        "│             (logged as off-policy)        │",
         "│                                           │",
-        f"│     /model {req_full:<30} │",
-        "│     /plouto comply                        │",
-        "│                                           │",
-        "│   Or click Allow to override once.        │",
+        "│   Deny   →  switch first; in your next    │",
+        "│             prompt run:                   │",
+        f"│             /model {req_full:<22} │",
+        "│             /plouto comply                │",
         "╰───────────────────────────────────────────╯",
     ]
     return "\n".join(lines)

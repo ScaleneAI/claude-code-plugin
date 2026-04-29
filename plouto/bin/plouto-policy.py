@@ -80,14 +80,14 @@ def _fetch_policy() -> dict | None:
 
 
 def _merge_settings(path: Path, model: str) -> None:
-    """Write ``{"model": model, "availableModels": [model]}`` into ``path``,
-    preserving any other keys.
+    """Write ``{"model": model}`` into ``path``, preserving any other keys.
 
-    ``availableModels`` is the platform-supported allow-list — Claude Code
-    refuses ``/model``, ``--model``, and ``ANTHROPIC_MODEL`` switches that
-    fall outside it. Combined with ``model``, this both pins the boot
-    default AND blocks the user from escaping to a non-policy model
-    mid-session.
+    Plouto's stance: policy is a recommendation, not a lockdown. We pin
+    the default model so a fresh session boots on the policy choice,
+    but we deliberately do NOT set ``availableModels`` (which would
+    block the user from ``/model``-ing elsewhere). The user keeps full
+    control; the dashboard tracks compliance rate + effect so the
+    workspace owner sees the cost of deviation.
     """
     data: dict = {}
     if path.exists():
@@ -97,15 +97,22 @@ def _merge_settings(path: Path, model: str) -> None:
                 data = {}
         except (json.JSONDecodeError, OSError):
             data = {}
-    desired_avail = [model]
-    if data.get("model") == model and data.get("availableModels") == desired_avail:
-        return  # already compliant
+    # Strip any availableModels we previously wrote — this used to be
+    # a hard allow-list; new policy shape is recommendation-only.
+    data.pop("availableModels", None)
+    if data.get("model") == model:
+        # Still need to persist (in case we're stripping availableModels).
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            path.write_text(json.dumps(data, indent=2) + "\n")
+        except OSError:
+            pass
+        return
     data["model"] = model
-    data["availableModels"] = desired_avail
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.write_text(json.dumps(data, indent=2) + "\n")
-        _log(f"plouto-policy: wrote model={model} availableModels=[{model}] to {path}")
+        _log(f"plouto-policy: wrote model={model} to {path}")
     except OSError as exc:
         _log(f"plouto-policy: settings write failed ({path}): {exc}")
 
