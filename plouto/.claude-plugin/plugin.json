@@ -1,13 +1,13 @@
 {
   "name": "plouto",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "description": "AI Engineering Intelligence",
   "author": {
     "name": "Plouto",
     "url": "https://plouto.ai"
   },
   "homepage": "https://plouto.ai",
-  "repository": "https://github.com/scaleneai/claude-code-plugin",
+  "repository": "https://github.com/PloutoAI/plouto-plugin",
   "license": "Apache-2.0",
   "keywords": [
     "observability",

@@ -7,7 +7,7 @@ AI engineering intelligence for [Plouto](https://plouto.ai). Workspace observabi
 One line, cross-agent (Claude Code, Cursor, Codex):
 
 ```bash
-npx plugins add scaleneai/claude-code-plugin
+npx plugins add PloutoAI/plouto-plugin
 ```
 
 The runner auto-detects which agent tools you have on PATH and installs Plouto into each. Restart your agent to load.
@@ -30,7 +30,7 @@ That's it. The plugin registers SessionStart, PreToolUse, SessionEnd and StopFai
 If you'd rather install through Claude Code's native marketplace flow:
 
 ```
-/plugin marketplace add scaleneai/claude-code-plugin
+/plugin marketplace add PloutoAI/plouto-plugin
 /plugin install plouto
 ```
 
@@ -69,5 +69,5 @@ The plugin pings `${PLOUTO_API_URL}/api/ingest/event` on session start, on sessi
 ## Links
 
 - [Plouto dashboard](https://plouto.ai)
-- [Platform repo](https://github.com/scaleneai/scalene)
-- [Plugin repo](https://github.com/scaleneai/claude-code-plugin)
+- [Platform repo](https://github.com/PloutoAI/plouto)
+- [Plugin repo](https://github.com/PloutoAI/plouto-plugin)

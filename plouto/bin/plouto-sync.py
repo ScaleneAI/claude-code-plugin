@@ -24,7 +24,7 @@ Usage:
     python3 plouto-sync.py --api-url https://api.plouto.ai --token <bearer>
     python3 plouto-sync.py --api-url ... --token ... --session-only <id>
 
-Audit this file: https://github.com/scaleneai/claude-code-plugin/blob/main/plouto/bin/plouto-sync.py
+Audit this file: https://github.com/PloutoAI/plouto-plugin/blob/main/plouto/bin/plouto-sync.py
 """
 
 from __future__ import annotations
