@@ -80,7 +80,15 @@ def _fetch_policy() -> dict | None:
 
 
 def _merge_settings(path: Path, model: str) -> None:
-    """Write ``{"model": model}`` into ``path``, preserving any other keys."""
+    """Write ``{"model": model, "availableModels": [model]}`` into ``path``,
+    preserving any other keys.
+
+    ``availableModels`` is the platform-supported allow-list — Claude Code
+    refuses ``/model``, ``--model``, and ``ANTHROPIC_MODEL`` switches that
+    fall outside it. Combined with ``model``, this both pins the boot
+    default AND blocks the user from escaping to a non-policy model
+    mid-session.
+    """
     data: dict = {}
     if path.exists():
         try:
@@ -89,23 +97,30 @@ def _merge_settings(path: Path, model: str) -> None:
                 data = {}
         except (json.JSONDecodeError, OSError):
             data = {}
-    if data.get("model") == model:
+    desired_avail = [model]
+    if data.get("model") == model and data.get("availableModels") == desired_avail:
         return  # already compliant
     data["model"] = model
+    data["availableModels"] = desired_avail
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.write_text(json.dumps(data, indent=2) + "\n")
-        _log(f"plouto-policy: wrote model={model} to {path}")
+        _log(f"plouto-policy: wrote model={model} availableModels=[{model}] to {path}")
     except OSError as exc:
         _log(f"plouto-policy: settings write failed ({path}): {exc}")
 
 
-def _set_flag(reason: str) -> None:
+def _set_flag(required: str, current: str) -> None:
+    """Persist a JSON flag the gate hook reads to render its ASCII prompt."""
     path = _flag_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps({"required": required, "current": current})
     try:
-        path.write_text(reason + "\n")
-        _log(f"plouto-policy: violation flag set: {reason}")
+        path.write_text(payload + "\n")
+        _log(
+            f"plouto-policy: violation flag set: required={required} "
+            f"current={current}"
+        )
     except OSError as exc:
         _log(f"plouto-policy: flag write failed: {exc}")
 
@@ -160,14 +175,11 @@ def main() -> None:
     notes: list[str] = []
 
     if policy_model and active_model and active_model != policy_model:
-        _set_flag(
-            f"workspace policy requires {policy_model}; "
-            f"active session is {active_model}"
-        )
+        _set_flag(required=policy_model, current=active_model)
         notes.append(
             f"Plouto workspace policy: required model is `{policy_model}`. "
-            f"This session is on `{active_model}`. Tool calls will be "
-            f"blocked until you run `/model {policy_model}` then "
+            f"This session is on `{active_model}`. Tool calls will prompt "
+            f"for approval until you run `/model {policy_model}` then "
             f"`/plouto comply` — or `/exit` and `claude --resume` to apply "
             f"the just-written settings.local.json."
         )
