@@ -1,7 +1,7 @@
 {
   "name": "plouto",
   "version": "0.1.27",
-  "description": "AI Engineering Intelligence",
+  "description": "AI Engineering Intelligence — workspace observability and policy push-down for AI coding agents.",
   "author": {
     "name": "Plouto",
     "url": "https://plouto.ai"
@@ -13,10 +13,10 @@
     "observability",
     "ai-engineering",
     "claude-code",
+    "cursor",
+    "codex",
     "policy",
-    "compliance"
-  ],
-  "commands": [
-    "./commands/plouto.md"
+    "compliance",
+    "telemetry"
   ]
 }
